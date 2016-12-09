@@ -346,47 +346,52 @@ function ftcsv.parse(inputFile, delimiter, options)
         error('ftcsv: Cannot parse an empty file')
     end
 
-    -- parse through the headers!
-    local headerField, i = parseString(inputString, inputLength, delimiter, 1)
-    i = i + 1 -- start at the next char
+    local headerField, i
+    if header then
+        -- parse through the headers!
+        headerField, i = parseString(inputString, inputLength, delimiter, 1)
+        i = i + 1 -- start at the next char
 
-    -- make sure a header isn't empty
-    for _, header in ipairs(headerField) do
-        if #header == 0 then
-            error('ftcsv: Cannot parse a file which contains empty headers')
+        -- make sure a header isn't empty
+        for _, header in ipairs(headerField) do
+            if #header == 0 then
+                error('ftcsv: Cannot parse a file which contains empty headers')
+            end
         end
-    end
 
-    -- for files where there aren't headers!
-    if header == false then
+        if rename then
+            -- basic rename (["a" = "apple"])
+            for j = 1, #headerField do
+                if rename[headerField[j]] then
+                    -- print("RENAMING", headerField[j], rename[headerField[j]])
+                    headerField[j] = rename[headerField[j]]
+                end
+            end
+        end
+
+
+        -- apply some sweet header manipulation
+        if headerFunc then
+            for j = 1, #headerField do
+                headerField[j] = headerFunc(headerField[j])
+            end
+        end
+    else
         i = 0
-        for j = 1, #headerField do
-            headerField[j] = j
-        end
-    end
-
-    -- rename fields as needed!
-    if rename then
-        -- basic rename (["a" = "apple"])
-        for j = 1, #headerField do
-            if rename[headerField[j]] then
-                -- print("RENAMING", headerField[j], rename[headerField[j]])
-                headerField[j] = rename[headerField[j]]
+        headerField = setmetatable({}, {
+            __index = function(self, j)
+                if rename then
+                    local k = rename[j]
+                    if k ~= nil then
+                        j = k
+                    end
+                end
+                if headerFunc then
+                    j = headerFunc(j)
+                end
+                return j
             end
-        end
-        -- files without headers, but with a rename need to be handled too!
-        if #rename > 0 then
-            for j = 1, #rename do
-                headerField[j] = rename[j]
-            end
-        end
-    end
-
-    -- apply some sweet header manipulation
-    if headerFunc then
-        for j = 1, #headerField do
-            headerField[j] = headerFunc(headerField[j])
-        end
+        })
     end
 
     local output = parseString(inputString, inputLength, delimiter, i, headerField, fieldsToKeep)
